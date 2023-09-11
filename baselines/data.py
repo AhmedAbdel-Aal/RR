@@ -4,18 +4,9 @@ from torch.nn.utils.rnn import pad_sequence
 import pickle
 import json
 
-label_mapper = {
-    "Fact":0,
-    "Argument":1,
-    "Precedent":2,
-    "Ratio":3,
-    "RulingL":4,
-    "RulingP":5,
-    "Statute":6,
-}
 
 class SequenceClassificationDataset(Dataset):
-    def __init__(self, file_path):
+    def __init__(self, file_path, dataset_name):
         self.file_path = file_path
         self.data = self.load_documents()
         self.input_ids = []
@@ -24,6 +15,7 @@ class SequenceClassificationDataset(Dataset):
         self.sentence_masks = []
         self.attention_masks = []
         self.process_data()
+        self.label_mapper = self.get_label_mapper(dataset_name)
         
     def load_documents(self):
         with open(self.file_path) as f:
@@ -52,7 +44,7 @@ class SequenceClassificationDataset(Dataset):
     def __getitem__(self, index):
         input_ids = self.input_ids[index]
         label_ids = self.label_ids[index]
-        labels = torch.tensor([label_mapper[i] for i in label_ids])
+        labels = torch.tensor([self.label_mapper[i] for i in label_ids])
         attention_masks = self.attention_masks[index]
         sentence_masks = self.sentence_masks[index]
         
@@ -77,3 +69,51 @@ class SequenceClassificationDataset(Dataset):
         label_tensor = torch.cat(label_tensors)
         
         return padded_documents, label_tensor, lengths
+    
+    def get_label_mapper(self, dataset_name):
+        label_mappers = {
+            'malik_cl': {
+                "Fact": 0,
+                "Argument": 1,
+                "Precedent": 2,
+                "Ratio": 3,
+                "RulingL": 4,
+                "RulingP": 5,
+                "Statute": 6,
+            },
+            'malik_it': {
+                "Fact": 0,
+                "Argument": 1,
+                "Precedent": 2,
+                "Ratio": 3,
+                "RulingL": 4,
+                "RulingP": 5,
+                "Statute": 6,
+            },
+            'paheli': {
+                'Argument': 0,
+                'Statute': 1,
+                'Facts': 2,
+                'Ratio of the decision': 3,
+                'Ruling by Lower Court': 4,
+                'Ruling by Present Court': 5,
+                'Precedent': 6,
+            },
+            'build': {
+                "PREAMBLE": 0,
+                "FAC": 1,
+                "RLC": 2,
+                "ISSUE": 3,
+                "ARG_PETITIONER": 4,
+                "ARG_RESPONDENT": 5,
+                "ANALYSIS": 6,
+                "STA": 7,
+                "PRE_RELIED": 8,
+                "PRE_NOT_RELIED": 9,
+                "RATIO": 10,
+                "RPC": 11,
+                "NONE": 12,
+            }
+        }
+
+        return label_mappers.get(dataset_name, 'not implemented')

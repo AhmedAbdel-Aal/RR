@@ -51,9 +51,9 @@ print(f'loaded config file {mconfig}')
 root = dir_path = os.path.dirname(os.path.realpath(__file__))
 dataset_path = root + f"/datasets/{mconfig['dataset']}/"
 print('dataset_path:',dataset_path)
-train_dataset = SequenceClassificationDataset(Path(dataset_path,'train.json'))
-dev_dataset = SequenceClassificationDataset(Path(dataset_path, 'dev.json'))
-test_dataset = SequenceClassificationDataset(Path(dataset_path, 'test.json'))
+train_dataset = SequenceClassificationDataset(Path(dataset_path,'train.json'), mconfig['dataset'])
+dev_dataset = SequenceClassificationDataset(Path(dataset_path, 'dev.json'), mconfig['dataset'])
+test_dataset = SequenceClassificationDataset(Path(dataset_path, 'test.json'), mconfig['dataset'])
 
 print(f" size of train:{len(train_dataset)}, size of dev:{len(dev_dataset)}, size of test:{len(test_dataset)}")
 
