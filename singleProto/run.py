@@ -51,9 +51,9 @@ print(f'loaded config file {mconfig}')
 root = dir_path = os.path.dirname(os.path.realpath(__file__))
 dataset_path = root + f"/datasets/{mconfig['dataset']}/"
 print('dataset_path:',dataset_path)
-train_dataset = SequenceClassificationDataset(Path(dataset_path,'train.json'))
-dev_dataset = SequenceClassificationDataset(Path(dataset_path, 'dev.json'))
-test_dataset = SequenceClassificationDataset(Path(dataset_path, 'test.json'))
+train_dataset = SequenceClassificationDataset(Path(dataset_path,'train.json'), mconfig['dataset'])
+dev_dataset = SequenceClassificationDataset(Path(dataset_path, 'dev.json'), mconfig['dataset'])
+test_dataset = SequenceClassificationDataset(Path(dataset_path, 'test.json'), mconfig['dataset'])
 
 print(f" size of train:{len(train_dataset)}, size of dev:{len(dev_dataset)}, size of test:{len(test_dataset)}")
 
@@ -71,8 +71,8 @@ print(f"device used: {device}")
 model.to(device)
 
 # INIT OPTIMIZER
-optimizer = Adam(model.parameters(), lr=mconfig['lr'])
-epoch_scheduler = StepLR(optimizer, step_size=1, gamma=mconfig["lr_epoch_decay"])
+optimizer = Adam(model.parameters(), lr=mconfig['lr'], weight_decay=1e-3)
+epoch_scheduler = StepLR(optimizer, step_size=10, gamma=mconfig["lr_epoch_decay"])
 
 # START TRAINING
 train_epoch_losses = {'cls':[], 'cluster':[]}
@@ -122,3 +122,30 @@ save_model_state_dict(best_model, save_path)
 
 
 
+prototypes = best_model.proto_sim_model.prototypes.weight.data.cpu().numpy()
+np.save(root + f"/models/{mconfig['dataset']}/prototypes.npy", prototypes)
+
+
+import matplotlib.pyplot as plt
+
+# Plot the epoch loss
+plt.plot(train_epoch_losses['cls'], label='Training Loss')
+plt.plot(train_epoch_losses['cluster'], label='proto Loss')
+plt.plot(dev_epoch_losses, label='Validation Loss')
+
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+plt.title('Epoch Loss')
+plt.savefig(root +f"/models/{mconfig['dataset']}/train_plt.png")
+plt.show()
+
+# Plot the epoch accuracies
+#plt.plot(train_epoch_acc, label='Training acc')
+plt.plot(dev_epoch_f1, label='Validation acc')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.title('Epoch Accuracy')
+plt.savefig(root +f"/models/{mconfig['dataset']}/dev_plt.png")
+plt.show()

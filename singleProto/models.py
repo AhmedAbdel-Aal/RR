@@ -24,7 +24,9 @@ class ProtoSimModel(nn.Module):
         protos = F.normalize(protos, p=2, dim=-1)  # Normalize prototype embeddings
         relation_embedding = F.normalize(relation_embedding, p=2, dim=-1)  # Normalize input embeddings
         similarity = torch.sum(protos * relation_embedding, dim=-1)  # Cosine similarity
-        return similarity
+        similarity = torch.exp(similarity)
+        dist = 1 - 1 / (1+similarity)
+        return dist
 
 
     def get_cluster_loss(self, embeddings, labels):
@@ -37,8 +39,9 @@ class ProtoSimModel(nn.Module):
             other_embeddings = embeddings[~label_mask]
             p_sim = self.forward(label_embeddings, label)
             n_sim = self.forward(other_embeddings, label)
+            #print('SIM== ', p_sim, n_sim)
 
-            loss += -(torch.mean(torch.log1p(p_sim + 1e-5)) + torch.mean(torch.log1p(1 - n_sim + 1e-5)))
+            loss += -(torch.mean(torch.log(p_sim + 1e-5)) + torch.mean(torch.log(1 - n_sim + 1e-5)))*10
 
         loss /= batch_size
 
@@ -124,10 +127,10 @@ class BertHSLN(torch.nn.Module):
         # we use instead default dropout
         self.dropout = torch.nn.Dropout(config["dropout"])
         
-        # Initialize ProtoSimModel
-        self.proto_sim_model = ProtoSimModel(self.num_labels, 768)
-
         self.lstm_hidden_size = config["word_lstm_hs"]
+
+        # Initialize ProtoSimModel
+        self.proto_sim_model = ProtoSimModel(self.num_labels, self.lstm_hidden_size * 2)
 
         self.classifier = torch.nn.Linear(self.lstm_hidden_size * 2, self.num_labels)
 
