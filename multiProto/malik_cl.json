@@ -1,0 +1,18 @@
+{
+    "bert_model": "bert-base-uncased",
+    "bert_trainable": false,
+    "model": "BertHSLN",
+    "cacheable_tasks": [],
+    "use_crf": false,
+    "dropout": 0.5,
+    "word_lstm_hs": 384,
+    "att_pooling_dim_ctx": 50,
+    "att_pooling_num_ctx": 7,
+    "lr": 0.0003,
+    "lr_epoch_decay": 0.9,
+    "max_seq_length": 120,
+    "max_epochs": 300,
+    "early_stopping": 20,
+    "dataset": "malik_cl",
+    "nlabels":7
+}
