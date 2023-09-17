@@ -53,7 +53,7 @@ import numpy as np
 
 def training_step(model, optimizer, scheduler, data_loader, device, crf=False):
     model.train()  # Set the model to train mode
-    train_loss = {'cls': 0, 'cluster':0}
+    train_loss = {'sc':0, 'pc':0, 'cls': 0, 'loss':0}
     train_correct = 0
     train_total = 0
 
@@ -79,17 +79,21 @@ def training_step(model, optimizer, scheduler, data_loader, device, crf=False):
         outputs, embeddings = model(batch, labels, get_embeddings=True)
 
         # Calculate loss
-        classification_loss = outputs['loss']
-        cluster_loss = outputs['cluster_loss']
+        loss = outputs['loss']
+        sc_loss = outputs['sc_loss']
+        pc_loss = outputs['pc_loss']
+        cls_loss = outputs['cls_loss']
 
-        train_loss['cls'] = train_loss['cls'] + classification_loss.detach().item()
-        train_loss['cluster'] = train_loss['cluster'] + cluster_loss.detach().detach().item()
+        train_loss['loss'] = train_loss['loss'] + loss.detach().item()
+        train_loss['sc'] = train_loss['sc'] + sc_loss.detach().item()
+        train_loss['pc'] = train_loss['pc'] + pc_loss.detach().detach().item()
+        train_loss['cls'] = train_loss['cls'] + cls_loss.detach().detach().item()
 
         if batch_idx % 10 == 0:
-            print(f'After {batch_idx} steps: cls_loss {classification_loss}, cluster_loss {cluster_loss}')
+            print(f'After {batch_idx} steps: loss {loss} cls_loss {cls_loss}, pc_loss {pc_loss}, sc_loss {sc_loss}')
 
         # Backward pass and optimization
-        loss = classification_loss + cluster_loss
+        loss = loss + pc_loss + sc_loss + cls_loss
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
@@ -98,7 +102,9 @@ def training_step(model, optimizer, scheduler, data_loader, device, crf=False):
 
     # Calculate epoch statistics
     train_loss['cls'] = train_loss['cls'] / len(data_loader)
-    train_loss['cluster'] = train_loss['cluster'] / len(data_loader)
+    train_loss['pc'] = train_loss['pc'] / len(data_loader)
+    train_loss['sc'] = train_loss['sc'] / len(data_loader)
+    train_loss['loss'] = train_loss['loss'] / len(data_loader)
     return train_loss
 
 

@@ -14,41 +14,105 @@ import math
 
 class ProtoSimModel(nn.Module):
 
-    def __init__(self, relation_count, embedding_width):
+    def __init__(self, rhetorical_role, embedding_width):
         nn.Module.__init__(self)
-        self.prototypes = nn.Embedding(relation_count, embedding_width)
+        self.prototypes = nn.Embedding(rhetorical_role, embedding_width)
+        self.classification_layer = nn.Linear(embedding_width, rhetorical_role)
+        self.cross_entropy = torch.nn.CrossEntropyLoss()
 
-
-    def forward(self, relation_embedding, relation_id):
-        protos = self.prototypes(relation_id)
+    def forward(self, role_embedding, role_id):
+        protos = self.prototypes(role_id)
+        
         protos = F.normalize(protos, p=2, dim=-1)  # Normalize prototype embeddings
-        relation_embedding = F.normalize(relation_embedding, p=2, dim=-1)  # Normalize input embeddings
-        similarity = torch.sum(protos * relation_embedding, dim=-1)  # Cosine similarity
+        role_embedding = F.normalize(role_embedding, p=2, dim=-1)  # Normalize input embeddings
+        
+        similarity = torch.sum(protos * role_embedding, dim=-1)  # Cosine similarity
         similarity = torch.exp(similarity)
-        dist = 1 - 1 / (1+similarity)
-        return dist
+        dist = 1 - 1 / (1 + similarity)  # Cosine distance
+        
+        predict_role = self.classification_layer(protos)
+        
+        return dist, predict_role
 
-
-    def get_cluster_loss(self, embeddings, labels):
+    def get_proto_centric_loss(self, embeddings, labels):
+        """
+        prototypes centric view
+        """
         batch_size = embeddings.size(1)
-        loss = 0.0
+        cluster_loss = 0.0
 
         for label in torch.unique(labels):
             label_mask = labels == label
+            other_mask = labels != label
+
+
             label_embeddings = embeddings[label_mask]
-            other_embeddings = embeddings[~label_mask]
-            p_sim = self.forward(label_embeddings, label)
-            n_sim = self.forward(other_embeddings, label)
-            #print('SIM== ', p_sim, n_sim)
+            other_embeddings = embeddings[other_mask]
+            other_labels = labels[other_mask]  # Capture the labels for other embeddings
 
-            loss += -(torch.mean(torch.log(p_sim + 1e-5)) + torch.mean(torch.log(1 - n_sim + 1e-5)))*10
+            p_sim, _ = self.forward(label_embeddings, label)
+            n_sim, _ = self.forward(other_embeddings, label)
 
-        loss /= batch_size
+            cluster_loss += -(torch.mean(torch.log(p_sim + 1e-5)) + torch.mean(torch.log(1 - n_sim + 1e-5)))
 
-        return loss
+        cluster_loss /= batch_size
+
+        return cluster_loss
 
 
+    def get_classification_loss(self, embeddings, labels):
+        batch_size = embeddings.size(1)
+        cls_loss = 0.0
 
+        for label in torch.unique(labels):
+            label_mask = labels == label
+            other_mask = labels != label
+
+            label_embeddings = embeddings[label_mask]
+            other_embeddings = embeddings[other_mask]
+            other_labels = labels[other_mask]
+
+            _, p_predicted_role = self.forward(label_embeddings, label)
+            _, n_predicted_role = self.forward(other_embeddings, other_labels)
+
+            p_label = label.repeat(p_predicted_role.size(0)).type(torch.FloatTensor).cuda()
+
+            cls_loss += self.cross_entropy(p_predicted_role, p_label)
+            cls_loss += self.cross_entropy(n_predicted_role, other_labels)
+
+        cls_loss /= batch_size
+        return cls_loss
+    
+    def get_sample_centric_loss(self, embeddings, labels):
+        """
+        sample centric view
+        """
+        batch_size = embeddings.size(1)
+        cluster_loss = 0.0
+
+        unique_labels = torch.unique(labels)
+
+        for label in unique_labels:
+            label_mask = labels == label
+            label_embeddings = embeddings[label_mask]
+
+            # Calculate psim: distance between embeddings and their corresponding prototype
+            p_sim, _ = self.forward(label_embeddings, label)
+
+            # Calculate nsim: distance between embeddings and prototypes of different classes
+            other_labels = unique_labels[unique_labels != label]
+            n_sim_list = []
+            for other_label in other_labels:
+                n_sim, _ = self.forward(label_embeddings, other_label)
+                n_sim_list.append(n_sim)
+
+            n_sim = torch.mean(torch.stack(n_sim_list), dim=0)
+
+            cluster_loss += -(torch.mean(torch.log(p_sim + 1e-5)) + torch.mean(torch.log(1 - n_sim + 1e-5)))
+
+        cluster_loss /= batch_size
+
+        return cluster_loss
 
 
 class AttentionPooling(torch.nn.Module):
@@ -198,10 +262,15 @@ class BertHSLN(torch.nn.Module):
             output['predicted_label'] = predicted_labels
  
             loss = F.cross_entropy(logits, labels)
-            cluster_loss = self.proto_sim_model.get_cluster_loss(sentence_embeddings_encoded, labels.unsqueeze(0))
+            pc_loss = self.proto_sim_model.get_proto_centric_loss(sentence_embeddings_encoded, labels.unsqueeze(0))
+            sc_loss = self.proto_sim_model.get_sample_centric_loss(sentence_embeddings_encoded, labels.unsqueeze(0))
+            cls_loss = self.proto_sim_model.get_classification_loss(sentence_embeddings_encoded, labels.unsqueeze(0))
             
-            output['cluster_loss'] = cluster_loss
             output['loss'] = loss
+            output['pc_loss'] = pc_loss
+            output['sc_loss'] = sc_loss
+            output['cls_loss'] = cls_loss
+            
             output['logits']=logits
           else:
             logits = logits.squeeze()

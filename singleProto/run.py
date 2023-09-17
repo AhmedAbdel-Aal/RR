@@ -71,11 +71,11 @@ print(f"device used: {device}")
 model.to(device)
 
 # INIT OPTIMIZER
-optimizer = Adam(model.parameters(), lr=mconfig['lr'], weight_decay=1e-3)
-epoch_scheduler = StepLR(optimizer, step_size=10, gamma=mconfig["lr_epoch_decay"])
+optimizer = Adam(model.parameters(), lr=mconfig['lr'])
+epoch_scheduler = StepLR(optimizer, step_size=20, gamma=mconfig["lr_epoch_decay"])
 
 # START TRAINING
-train_epoch_losses = {'cls':[], 'cluster':[]}
+train_epoch_losses = {'loss': [], 'cls':[], 'pc':[], 'sc':[]}
 train_epoch_acc = []
 train_epoch_f1 = []
 
@@ -95,9 +95,11 @@ for epoch in range(epochs):
 
     # # Training
     train_loss = training_step(model, optimizer, epoch_scheduler, train_dataloader, device)
+    train_epoch_losses['loss'].append(train_loss['loss'])
     train_epoch_losses['cls'].append(train_loss['cls'])
-    train_epoch_losses['cluster'].append(train_loss['cluster'])
-    print(f"cls_loss {train_loss['cls']}, cluster_loss {train_loss['cluster']}")
+    train_epoch_losses['pc'].append(train_loss['pc'])
+    train_epoch_losses['sc'].append(train_loss['sc'])
+    print(f"loss {train_loss['loss']} cls_loss {train_loss['cls']}, pc {train_loss['pc']}, sc {train_loss['sc']}")
 
     # Validation
     dev_f1, dev_loss = validation_step(model, valid_dataloader, device)
@@ -115,7 +117,7 @@ test_loss, test_accuracy, predictions, true_labels = testing_step(best_model, te
 
 # SAVE BEST MODEL
 today = datetime.datetime.now().strftime('%Y/%m/%d')
-save_path = root + f"/models/{mconfig['dataset']}/model.pth"
+save_path = root + f"/models_2/{mconfig['dataset']}/model.pth"
 print('save_path:',save_path)
 save_model_state_dict(best_model, save_path)
 
@@ -123,23 +125,25 @@ save_model_state_dict(best_model, save_path)
 
 
 prototypes = best_model.proto_sim_model.prototypes.weight.data.cpu().numpy()
-np.save(root + f"/models/{mconfig['dataset']}/prototypes.npy", prototypes)
+np.save(root + f"/models_2/{mconfig['dataset']}/prototypes.npy", prototypes)
 
 
 import matplotlib.pyplot as plt
 
 # Plot the epoch loss
-plt.plot(train_epoch_losses['cls'], label='Training Loss')
-plt.plot(train_epoch_losses['cluster'], label='proto Loss')
+plt.plot(train_epoch_losses['loss'], label='Training Loss')
+plt.plot(train_epoch_losses['cls'], label='cls Loss')
+plt.plot(train_epoch_losses['pc'], label='pc Loss')
+plt.plot(train_epoch_losses['sc'], label='sc Loss')
 plt.plot(dev_epoch_losses, label='Validation Loss')
 
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
 plt.legend()
 plt.title('Epoch Loss')
-plt.savefig(root +f"/models/{mconfig['dataset']}/train_plt.png")
+plt.savefig(root +f"/models_2/{mconfig['dataset']}/train_plt.png")
 plt.show()
-
+plt.clf()
 # Plot the epoch accuracies
 #plt.plot(train_epoch_acc, label='Training acc')
 plt.plot(dev_epoch_f1, label='Validation acc')
@@ -147,5 +151,5 @@ plt.xlabel('Epoch')
 plt.ylabel('Accuracy')
 plt.legend()
 plt.title('Epoch Accuracy')
-plt.savefig(root +f"/models/{mconfig['dataset']}/dev_plt.png")
+plt.savefig(root +f"/models_2/{mconfig['dataset']}/dev_plt.png")
 plt.show()
