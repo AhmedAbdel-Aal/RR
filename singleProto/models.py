@@ -28,7 +28,7 @@ class ProtoSimModel(nn.Module):
         
         similarity = torch.sum(protos * role_embedding, dim=-1)  # Cosine similarity
         similarity = torch.exp(similarity)
-        dist = 1 - 1 / (1 + similarity)  # Cosine distance
+        dist = 1-(1 / (1 + similarity))  # Cosine distance
         
         predict_role = self.classification_layer(protos)
         

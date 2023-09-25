@@ -117,10 +117,15 @@ test_loss, test_accuracy, predictions, true_labels = testing_step(best_model, te
 
 # SAVE BEST MODEL
 today = datetime.datetime.now().strftime('%Y/%m/%d')
-save_path = root + f"/models_2/{mconfig['dataset']}/model.pth"
+save_path = root + f"/models_2/{mconfig['dataset']}/best_model.pth"
 print('save_path:',save_path)
 save_model_state_dict(best_model, save_path)
 
+# SAVE BEST MODEL
+today = datetime.datetime.now().strftime('%Y/%m/%d')
+save_path = root + f"/models_2/{mconfig['dataset']}/model.pth"
+print('save_path:',save_path)
+save_model_state_dict(best_model, save_path)
 
 
 

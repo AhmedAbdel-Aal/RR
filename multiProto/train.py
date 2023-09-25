@@ -53,7 +53,7 @@ import numpy as np
 
 def training_step(model, optimizer, scheduler, data_loader, device, crf=False):
     model.train()  # Set the model to train mode
-    train_loss = {'sc':0, 'cls': 0, 'loss':0}
+    train_loss = {'sc':0, 'cls': 0, 'd':0, 'loss':0}
     train_correct = 0
     train_total = 0
 
@@ -80,18 +80,20 @@ def training_step(model, optimizer, scheduler, data_loader, device, crf=False):
 
         # Calculate loss
         loss = outputs['loss']
-        sc_loss = outputs['sc_loss']
+        sc_loss = outputs['sc_loss'] 
         cls_loss = outputs['cls_loss']
+        d_loss = outputs['d_loss']
 
         train_loss['loss'] = train_loss['loss'] + loss.detach().item()
         train_loss['sc'] = train_loss['sc'] + sc_loss.detach().item()
         train_loss['cls'] = train_loss['cls'] + cls_loss.detach().detach().item()
+        train_loss['d'] = train_loss['d'] + cls_loss.detach().detach().item()
 
-        if batch_idx % 10 == 0:
-            print(f'After {batch_idx} steps: loss {loss} cls_loss {cls_loss}, sc_loss {sc_loss}')
+        #if batch_idx % 10 == 0:
+        #print(f'After {batch_idx} steps: loss {loss} cls_loss {cls_loss}, sc_loss {sc_loss}, d_loss {d_loss}')
 
         # Backward pass and optimization
-        loss = loss + pc_loss + sc_loss + cls_loss
+        loss = loss  + sc_loss + cls_loss +  d_loss
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
@@ -101,6 +103,7 @@ def training_step(model, optimizer, scheduler, data_loader, device, crf=False):
     # Calculate epoch statistics
     train_loss['cls'] = train_loss['cls'] / len(data_loader)
     train_loss['sc'] = train_loss['sc'] / len(data_loader)
+    train_loss['d'] = train_loss['d'] / len(data_loader)
     train_loss['loss'] = train_loss['loss'] / len(data_loader)
     return train_loss
 
